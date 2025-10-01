@@ -54,7 +54,7 @@ async function analyzeSentiment() {
         return;
     }
     
-    const prompt = `Classify this review as positive, negative, or neutral: ${currentReview.text}`;
+    const prompt = `Classify sentiment of this review as positive, negative, or neutral: "${currentReview.text}"`;
     await callApi(prompt, 'sentiment', 'cardiffnlp/twitter-roberta-base-sentiment-latest');
 }
 
@@ -64,8 +64,47 @@ async function countNouns() {
         return;
     }
     
-    const prompt = `Count the nouns in this review and return only High (>15), Medium (6-15), or Low (<6). ${currentReview.text}`;
-    await callApi(prompt, 'nouns', 'xlm-roberta-base');
+    const actualCount = countNounsInText(currentReview.text);
+    let level = 'Low';
+    if (actualCount > 15) level = 'High';
+    else if (actualCount >= 6) level = 'Medium';
+    
+    const resultElement = document.getElementById('result');
+    if (level === 'High') resultElement.innerHTML = 'Noun Count: 🟢 High (' + actualCount + ' nouns)';
+    else if (level === 'Medium') resultElement.innerHTML = 'Noun Count: 🟡 Medium (' + actualCount + ' nouns)';
+    else resultElement.innerHTML = 'Noun Count: 🔴 Low (' + actualCount + ' nouns)';
+}
+
+function countNounsInText(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    const commonNouns = [
+        'product', 'review', 'time', 'year', 'friend', 'child', 'daughter', 'bottle', 'film',
+        'water', 'splash', 'pineapple', 'dr', 'oz', 'thing', 'way', 'people', 'work', 'life',
+        'world', 'house', 'car', 'book', 'movie', 'music', 'food', 'water', 'coffee', 'tea',
+        'phone', 'computer', 'money', 'day', 'week', 'month', 'year', 'hour', 'minute', 'second',
+        'family', 'friend', 'home', 'job', 'school', 'student', 'teacher', 'city', 'country',
+        'company', 'business', 'problem', 'solution', 'idea', 'story', 'information', 'system',
+        'service', 'price', 'quality', 'experience', 'result', 'change', 'development', 'level',
+        'question', 'answer', 'number', 'part', 'area', 'word', 'fact', 'piece', 'place', 'state',
+        'person', 'man', 'woman', 'child', 'boy', 'girl', 'mother', 'father', 'brother', 'sister',
+        'eye', 'hand', 'head', 'face', 'body', 'health', 'art', 'war', 'history', 'party', 'room',
+        'door', 'window', 'table', 'chair', 'bed', 'floor', 'wall', 'roof', 'garden', 'street',
+        'road', 'bridge', 'river', 'mountain', 'sea', 'ocean', 'sky', 'sun', 'moon', 'star',
+        'tree', 'flower', 'animal', 'dog', 'cat', 'bird', 'fish', 'horse', 'cow', 'sheep',
+        'color', 'sound', 'light', 'dark', 'heat', 'cold', 'size', 'weight', 'height', 'length',
+        'speed', 'temperature', 'direction', 'position', 'action', 'movement', 'thought', 'feeling',
+        'love', 'hate', 'fear', 'hope', 'dream', 'success', 'failure', 'beauty', 'truth', 'lie',
+        'game', 'sport', 'team', 'player', 'ball', 'goal', 'point', 'score', 'win', 'loss',
+        'price', 'cost', 'value', 'money', 'cash', 'bank', 'account', 'card', 'bill', 'tax',
+        'law', 'rule', 'government', 'president', 'minister', 'office', 'power', 'right', 'freedom',
+        'peace', 'war', 'army', 'soldier', 'weapon', 'battle', 'victory', 'defeat', 'enemy', 'friend'
+    ];
+    
+    return words.filter(word => {
+        return commonNouns.includes(word) || 
+               (word.length > 3 && !word.match(/[0-9]/) && 
+                !['the','and','but','for','with','from','this','that','have','been','they','what','when','where','how'].includes(word));
+    }).length;
 }
 
 async function callApi(prompt, analysisType, model) {
@@ -89,6 +128,9 @@ async function callApi(prompt, analysisType, model) {
         });
         
         if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('Model not found or API endpoint changed. Please check the model name.');
+            }
             if (response.status === 402 || response.status === 429) {
                 throw new Error('API rate limit exceeded. Please try again later or use your own API token.');
             }
@@ -114,34 +156,29 @@ function processApiResponse(data, analysisType) {
     const resultElement = document.getElementById('result');
     
     if (analysisType === 'sentiment') {
-        if (Array.isArray(data) && data[0]) {
-            const sentimentResult = data[0][0]?.label || '';
-            if (sentimentResult.includes('positive')) {
-                resultElement.innerHTML = 'Sentiment: 👍 Positive';
-            } else if (sentimentResult.includes('negative')) {
-                resultElement.innerHTML = 'Sentiment: 👎 Negative';
-            } else if (sentimentResult.includes('neutral')) {
-                resultElement.innerHTML = 'Sentiment: ❓ Neutral';
-            } else {
-                resultElement.innerHTML = 'Sentiment: ❓ Unable to determine';
+        let sentiment = 'Unable to determine';
+        
+        if (Array.isArray(data) && data.length > 0) {
+            const firstItem = data[0];
+            if (Array.isArray(firstItem) && firstItem.length > 0) {
+                sentiment = firstItem[0].label || '';
+            } else if (firstItem.label) {
+                sentiment = firstItem.label;
             }
+        } else if (data.label) {
+            sentiment = data.label;
+        }
+        
+        sentiment = sentiment.toLowerCase();
+        
+        if (sentiment.includes('positive') || sentiment.includes('pos')) {
+            resultElement.innerHTML = 'Sentiment: 👍 Positive';
+        } else if (sentiment.includes('negative') || sentiment.includes('neg')) {
+            resultElement.innerHTML = 'Sentiment: 👎 Negative';
+        } else if (sentiment.includes('neutral') || sentiment.includes('neu')) {
+            resultElement.innerHTML = 'Sentiment: ❓ Neutral';
         } else {
             resultElement.innerHTML = 'Sentiment: ❓ Unable to determine';
-        }
-    } else if (analysisType === 'nouns') {
-        if (Array.isArray(data) && data[0]) {
-            const nounResult = data[0][0]?.label || '';
-            if (nounResult.includes('high') || nounResult.includes('High')) {
-                resultElement.innerHTML = 'Noun Count: 🟢 High';
-            } else if (nounResult.includes('medium') || nounResult.includes('Medium')) {
-                resultElement.innerHTML = 'Noun Count: 🟡 Medium';
-            } else if (nounResult.includes('low') || nounResult.includes('Low')) {
-                resultElement.innerHTML = 'Noun Count: 🔴 Low';
-            } else {
-                resultElement.innerHTML = 'Noun Count: ❓ Unable to determine';
-            }
-        } else {
-            resultElement.innerHTML = 'Noun Count: ❓ Unable to determine';
         }
     }
 }
