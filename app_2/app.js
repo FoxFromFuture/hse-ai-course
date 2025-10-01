@@ -55,7 +55,7 @@ async function analyzeSentiment() {
     }
     
     const prompt = `Classify this review as positive, negative, or neutral: ${currentReview.text}`;
-    await callApi(prompt, 'sentiment');
+    await callApi(prompt, 'sentiment', 'cardiffnlp/twitter-roberta-base-sentiment-latest');
 }
 
 async function countNouns() {
@@ -65,10 +65,10 @@ async function countNouns() {
     }
     
     const prompt = `Count the nouns in this review and return only High (>15), Medium (6-15), or Low (<6). ${currentReview.text}`;
-    await callApi(prompt, 'nouns');
+    await callApi(prompt, 'nouns', 'xlm-roberta-base');
 }
 
-async function callApi(prompt, analysisType) {
+async function callApi(prompt, analysisType, model) {
     resetUI();
     showSpinner(true);
     
@@ -82,7 +82,7 @@ async function callApi(prompt, analysisType) {
     }
     
     try {
-        const response = await fetch('https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct', {
+        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({ inputs: prompt })
@@ -100,11 +100,8 @@ async function callApi(prompt, analysisType) {
         if (data.error) {
             throw new Error(data.error);
         }
-        
-        const resultText = data[0]?.generated_text || '';
-        const firstLine = resultText.split('\n')[0].toLowerCase().trim();
-        
-        displayResult(firstLine, analysisType);
+
+        processApiResponse(data, analysisType);
         
     } catch (error) {
         showError(error.message);
@@ -113,26 +110,36 @@ async function callApi(prompt, analysisType) {
     }
 }
 
-function displayResult(result, analysisType) {
+function processApiResponse(data, analysisType) {
     const resultElement = document.getElementById('result');
     
     if (analysisType === 'sentiment') {
-        if (result.includes('positive')) {
-            resultElement.innerHTML = 'Sentiment: 👍 Positive';
-        } else if (result.includes('negative')) {
-            resultElement.innerHTML = 'Sentiment: 👎 Negative';
-        } else if (result.includes('neutral')) {
-            resultElement.innerHTML = 'Sentiment: ❓ Neutral';
+        if (Array.isArray(data) && data[0]) {
+            const sentimentResult = data[0][0]?.label || '';
+            if (sentimentResult.includes('positive')) {
+                resultElement.innerHTML = 'Sentiment: 👍 Positive';
+            } else if (sentimentResult.includes('negative')) {
+                resultElement.innerHTML = 'Sentiment: 👎 Negative';
+            } else if (sentimentResult.includes('neutral')) {
+                resultElement.innerHTML = 'Sentiment: ❓ Neutral';
+            } else {
+                resultElement.innerHTML = 'Sentiment: ❓ Unable to determine';
+            }
         } else {
             resultElement.innerHTML = 'Sentiment: ❓ Unable to determine';
         }
     } else if (analysisType === 'nouns') {
-        if (result.includes('high')) {
-            resultElement.innerHTML = 'Noun Count: 🟢 High';
-        } else if (result.includes('medium')) {
-            resultElement.innerHTML = 'Noun Count: 🟡 Medium';
-        } else if (result.includes('low')) {
-            resultElement.innerHTML = 'Noun Count: 🔴 Low';
+        if (Array.isArray(data) && data[0]) {
+            const nounResult = data[0][0]?.label || '';
+            if (nounResult.includes('high') || nounResult.includes('High')) {
+                resultElement.innerHTML = 'Noun Count: 🟢 High';
+            } else if (nounResult.includes('medium') || nounResult.includes('Medium')) {
+                resultElement.innerHTML = 'Noun Count: 🟡 Medium';
+            } else if (nounResult.includes('low') || nounResult.includes('Low')) {
+                resultElement.innerHTML = 'Noun Count: 🔴 Low';
+            } else {
+                resultElement.innerHTML = 'Noun Count: ❓ Unable to determine';
+            }
         } else {
             resultElement.innerHTML = 'Noun Count: ❓ Unable to determine';
         }
