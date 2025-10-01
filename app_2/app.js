@@ -82,7 +82,7 @@ async function callApi(prompt, analysisType) {
     }
     
     try {
-        const response = await fetch('https://api-inference.huggingface.co/models/tiiuae/falcon3-7b-base', {
+        const response = await fetch('https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct', {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({ inputs: prompt })
