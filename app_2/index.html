@@ -8,175 +8,268 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             line-height: 1.6;
             color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        
-        .container {
             background: white;
-            border-radius: 10px;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
             padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
             text-align: center;
-            margin-bottom: 30px;
-            color: #2c3e50;
         }
-        
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
         .input-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
-        
+
         label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-weight: 600;
+            color: #4b5563;
         }
-        
-        input[type="text"] {
+
+        input {
             width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
             font-size: 16px;
+            transition: all 0.3s ease;
         }
-        
-        input[type="text"]:focus {
-            border-color: #3498db;
+
+        input:focus {
             outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
-        
+
         .button-group {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 25px;
         }
-        
+
         button {
-            padding: 12px;
+            padding: 14px 20px;
             border: none;
-            border-radius: 5px;
-            background: #3498db;
-            color: white;
+            border-radius: 10px;
             font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        button:hover {
-            background: #2980b9;
-        }
-        
-        button:disabled {
-            background: #bdc3c7;
-            cursor: not-allowed;
-        }
-        
-        .review-card {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            min-height: 100px;
-        }
-        
-        .result-card {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-size: 24px;
-            min-height: 80px;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 8px;
         }
-        
-        .error {
-            background: #fee;
-            border: 2px solid #f5c6cb;
-            border-radius: 8px;
-            padding: 15px;
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #4338ca;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-tertiary {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-tertiary:hover:not(:disabled) {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        .review-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            min-height: 120px;
+        }
+
+        .review-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #475569;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .result-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .result-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 2px solid #fecaca;
+            color: #dc2626;
+            padding: 16px;
+            border-radius: 10px;
             margin-bottom: 20px;
-            color: #721c24;
             display: none;
         }
-        
+
         .spinner {
             display: none;
             text-align: center;
-            font-size: 40px;
-            color: #3498db;
-            margin: 20px 0;
+            padding: 20px;
         }
-        
-        @media (max-width: 600px) {
+
+        .spinner i {
+            font-size: 2rem;
+            color: #4f46e5;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 640px) {
             .button-group {
                 grid-template-columns: 1fr;
             }
             
-            body {
-                padding: 10px;
+            .results {
+                grid-template-columns: 1fr;
             }
             
-            .container {
-                padding: 20px;
+            h1 {
+                font-size: 2rem;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1><i class="fas fa-chart-bar"></i> Review Analyzer</h1>
+        <header>
+            <h1>Review Analyzer</h1>
+            <div class="subtitle">AI-powered sentiment and content analysis</div>
+        </header>
         
-        <div class="input-group">
-            <label for="token-input">
-                <i class="fas fa-key"></i> Hugging Face API Token (optional):
-            </label>
-            <input type="text" id="token-input" placeholder="Enter your API token for better performance">
-        </div>
-        
-        <div class="button-group">
-            <button id="random-review">
-                <i class="fas fa-random"></i> Random Review
-            </button>
-            <button id="analyze-sentiment">
-                <i class="fas fa-smile"></i> Analyze Sentiment
-            </button>
-            <button id="count-nouns">
-                <i class="fas fa-list-ol"></i> Count Nouns
-            </button>
-        </div>
-        
-        <div class="review-card" id="review-text">
-            Click "Random Review" to load a review
-        </div>
-        
-        <div class="result-card" id="result">
-            Results will appear here
-        </div>
-        
-        <div class="error" id="error-message"></div>
-        
-        <div class="spinner" id="spinner">
-            <i class="fas fa-spinner fa-spin"></i>
+        <div class="main-content">
+            <div class="input-group">
+                <label for="token-input">
+                    <i class="fas fa-key"></i> Hugging Face API Token (Optional)
+                </label>
+                <input type="password" id="token-input" placeholder="Enter your token for higher rate limits">
+            </div>
+
+            <div class="button-group">
+                <button id="random-btn" class="btn-primary">
+                    <i class="fas fa-shuffle"></i> Random Review
+                </button>
+                <button id="sentiment-btn" class="btn-secondary">
+                    <i class="fas fa-heart"></i> Analyze Sentiment
+                </button>
+                <button id="nouns-btn" class="btn-tertiary">
+                    <i class="fas fa-chart-bar"></i> Count Nouns
+                </button>
+            </div>
+
+            <div class="review-card">
+                <div id="review-text" class="review-text">
+                    Click "Random Review" to load a review for analysis
+                </div>
+            </div>
+
+            <div class="results">
+                <div class="result-card">
+                    <div class="result-label">Sentiment</div>
+                    <div id="sentiment-result" class="result-value">❓</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Noun Count Level</div>
+                    <div id="nouns-result" class="result-value">⚪</div>
+                </div>
+            </div>
+
+            <div id="error-message" class="error-message"></div>
+
+            <div id="spinner" class="spinner">
+                <i class="fas fa-spinner"></i>
+            </div>
         </div>
     </div>
 
