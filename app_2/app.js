@@ -1,263 +1,274 @@
-let reviews = [];
-let currentReview = null;
+class ReviewAnalyzer {
+    constructor() {
+        this.reviews = [];
+        this.currentReview = null;
+        this.isLoading = false;
 
-const tokenInput = document.getElementById('token-input');
-const randomBtn = document.getElementById('random-btn');
-const sentimentBtn = document.getElementById('sentiment-btn');
-const nounsBtn = document.getElementById('nouns-btn');
-const reviewText = document.getElementById('review-text');
-const sentimentResult = document.getElementById('sentiment-result');
-const nounsResult = document.getElementById('nouns-result');
-const errorMessage = document.getElementById('error-message');
-const spinner = document.getElementById('spinner');
+        this.initializeElements();
+        this.loadReviews();
+        this.attachEventListeners();
+    }
 
-const MODEL_ENDPOINTS = [
-    'https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct',
-    'https://api-inference.huggingface.co/models/microsoft/DialoGPT-large'
-];
+    initializeElements() {
+        this.reviewTextElement = document.getElementById('review-text');
+        this.sentimentResultElement = document.getElementById('sentiment-result');
+        this.nounResultElement = document.getElementById('noun-result');
+        this.errorMessageElement = document.getElementById('error-message');
+        this.spinnerElement = document.getElementById('spinner');
+        this.randomReviewButton = document.getElementById('random-review');
+        this.analyzeSentimentButton = document.getElementById('analyze-sentiment');
+        this.countNounsButton = document.getElementById('count-nouns');
+        this.apiTokenInput = document.getElementById('api-token');
+    }
 
-let currentModelIndex = 0;
-
-async function loadReviews() {
-    try {
-        showSpinner();
-        const response = await fetch('reviews_test.tsv');
-        const tsvData = await response.text();
-        
-        Papa.parse(tsvData, {
-            header: true,
-            delimiter: '\t',
-            complete: function(results) {
-                reviews = results.data.filter(review => review.text && review.text.trim());
-                hideSpinner();
-                if (reviews.length === 0) {
-                    showError('No reviews found in the TSV file');
+    async loadReviews() {
+        try {
+            this.showSpinner();
+            const response = await fetch('reviews_test.tsv');
+            const tsvData = await response.text();
+            
+            Papa.parse(tsvData, {
+                header: true,
+                delimiter: '\t',
+                complete: (results) => {
+                    this.reviews = results.data.filter(review => review.text && review.text.trim());
+                    this.hideSpinner();
+                    if (this.reviews.length === 0) {
+                        this.showError('No reviews found in the TSV file');
+                    }
+                },
+                error: (error) => {
+                    this.showError('Failed to parse TSV file: ' + error.message);
+                    this.hideSpinner();
                 }
-            },
-            error: function(error) {
-                hideSpinner();
-                showError('Error parsing TSV file: ' + error.message);
-            }
-        });
-    } catch (error) {
-        hideSpinner();
-        showError('Error loading reviews: ' + error.message);
-    }
-}
-
-function showSpinner() {
-    spinner.style.display = 'block';
-}
-
-function hideSpinner() {
-    spinner.style.display = 'none';
-}
-
-function showError(message) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-}
-
-function hideError() {
-    errorMessage.style.display = 'none';
-}
-
-function resetUI() {
-    sentimentResult.textContent = '❓';
-    nounsResult.textContent = '⚪';
-    hideError();
-}
-
-function getRandomReview() {
-    if (reviews.length === 0) {
-        showError('No reviews available');
-        return null;
-    }
-    return reviews[Math.floor(Math.random() * reviews.length)];
-}
-
-function countNouns(text) {
-    const nounRegex = /\b(NN|NNS|NNP|NNPS)\b/;
-    const posTags = [
-        'NN', 'NNS', 'NNP', 'NNPS'
-    ];
-    
-    const words = text.toLowerCase().split(/\s+/);
-    let nounCount = 0;
-    
-    words.forEach(word => {
-        if (word.length < 2) return;
-        
-        const cleanWord = word.replace(/[^a-z]/g, '');
-        if (cleanWord.length < 2) return;
-        
-        if (posTags.some(tag => {
-            const pattern = new RegExp(`\\b${cleanWord}\\b`, 'i');
-            return nounRegex.test(tag) && pattern.test(text);
-        })) {
-            nounCount++;
-        } else {
-            if (cleanWord.length > 3 && 
-                !['the', 'and', 'but', 'for', 'nor', 'not', 'yet', 'so'].includes(cleanWord) &&
-                !cleanWord.endsWith('ly') && !cleanWord.endsWith('ing') && 
-                !cleanWord.endsWith('ed') && !cleanWord.endsWith('es') &&
-                !cleanWord.match(/^\d+$/) && cleanWord.match(/[aeiou]/i)) {
-                nounCount++;
-            }
+            });
+        } catch (error) {
+            this.showError('Failed to load reviews file: ' + error.message);
+            this.hideSpinner();
         }
-    });
-    
-    return nounCount;
-}
-
-async function callApi(prompt, text) {
-    const fullPrompt = prompt + text;
-    const token = tokenInput.value.trim();
-    
-    const headers = {
-        'Content-Type': 'application/json',
-    };
-    
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
     }
-    
-    try {
-        const response = await fetch(MODEL_ENDPOINTS[currentModelIndex], {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ inputs: fullPrompt })
-        });
-        
-        if (response.status === 402 || response.status === 429) {
-            if (currentModelIndex < MODEL_ENDPOINTS.length - 1) {
-                currentModelIndex++;
-                return await callApi(prompt, text);
+
+    attachEventListeners() {
+        this.randomReviewButton.addEventListener('click', () => this.selectRandomReview());
+        this.analyzeSentimentButton.addEventListener('click', () => this.analyzeSentiment());
+        this.countNounsButton.addEventListener('click', () => this.countNouns());
+    }
+
+    selectRandomReview() {
+        if (this.reviews.length === 0) {
+            this.showError('No reviews available. Please wait for reviews to load.');
+            return;
+        }
+
+        const randomIndex = Math.floor(Math.random() * this.reviews.length);
+        this.currentReview = this.reviews[randomIndex];
+        this.reviewTextElement.textContent = this.currentReview.text;
+        this.clearResults();
+        this.hideError();
+    }
+
+    async analyzeSentiment() {
+        if (!this.validateReview()) return;
+
+        const prompt = `Classify this review as positive, negative, or neutral: ${this.currentReview.text}`;
+        await this.callApi(prompt, 'sentiment');
+    }
+
+    async countNouns() {
+        if (!this.validateReview()) return;
+
+        const prompt = `Count the nouns in this review and return only High (>15), Medium (6-15), or Low (<6). ${this.currentReview.text}`;
+        await this.callApi(prompt, 'nouns');
+    }
+
+    async callApi(prompt, analysisType) {
+        if (this.isLoading) return;
+
+        this.showSpinner();
+        this.hideError();
+        this.isLoading = true;
+
+        try {
+            const token = this.apiTokenInput.value.trim();
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            // Use different models for different tasks
+            const model = analysisType === 'sentiment' 
+                ? 'microsoft/DialoGPT-medium'  // Good for classification tasks
+                : 'microsoft/DialoGPT-large';  // Better for complex counting tasks
+
+            const response = await fetch(
+                `https://api-inference.huggingface.co/models/${model}`,
+                {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ inputs: prompt })
+                }
+            );
+
+            if (!response.ok) {
+                await this.handleApiError(response);
+                return;
+            }
+
+            const data = await response.json();
+            this.processApiResponse(data, analysisType);
+
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        } finally {
+            this.hideSpinner();
+            this.isLoading = false;
+        }
+    }
+
+    processApiResponse(data, analysisType) {
+        try {
+            let resultText = '';
+            
+            if (data && data[0] && data[0].generated_text) {
+                resultText = data[0].generated_text.toLowerCase().trim();
+            } else if (data && data.generated_text) {
+                resultText = data.generated_text.toLowerCase().trim();
             } else {
-                throw new Error('Rate limit exceeded on all models. Please try again later or use your API token.');
+                throw new Error('Unexpected API response format');
             }
+
+            // Extract first line and clean up the response
+            const firstLine = resultText.split('\n')[0].trim();
+            
+            if (analysisType === 'sentiment') {
+                this.processSentimentResult(firstLine);
+            } else {
+                this.processNounResult(firstLine);
+            }
+
+        } catch (error) {
+            this.showError('Failed to process API response: ' + error.message);
         }
-        
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
+    }
+
+    processSentimentResult(result) {
+        if (result.includes('positive')) {
+            this.sentimentResultElement.textContent = '👍';
+            this.sentimentResultElement.style.color = '#10b981';
+        } else if (result.includes('negative')) {
+            this.sentimentResultElement.textContent = '👎';
+            this.sentimentResultElement.style.color = '#ef4444';
+        } else if (result.includes('neutral')) {
+            this.sentimentResultElement.textContent = '❓';
+            this.sentimentResultElement.style.color = '#6b7280';
+        } else {
+            this.showError('Could not determine sentiment from response');
         }
-        
-        const data = await response.json();
-        return data[0]?.generated_text || '';
-    } catch (error) {
-        if (error.message.includes('Rate limit') && currentModelIndex < MODEL_ENDPOINTS.length - 1) {
-            currentModelIndex++;
-            return await callApi(prompt, text);
+    }
+
+    processNounResult(result) {
+        if (result.includes('high') || result.includes('>15')) {
+            this.nounResultElement.textContent = '🟢';
+            this.nounResultElement.style.color = '#10b981';
+        } else if (result.includes('medium') || (result.includes('6') && result.includes('15'))) {
+            this.nounResultElement.textContent = '🟡';
+            this.nounResultElement.style.color = '#f59e0b';
+        } else if (result.includes('low') || result.includes('<6')) {
+            this.nounResultElement.textContent = '🔴';
+            this.nounResultElement.style.color = '#ef4444';
+        } else {
+            // Fallback: count nouns manually from the original text
+            this.fallbackNounCount();
         }
-        throw error;
+    }
+
+    fallbackNounCount() {
+        // Simple noun counting fallback using common noun patterns
+        const text = this.currentReview.text.toLowerCase();
+        const nounPattern = /\b(the |a |an )?[a-z]+(ing|ed|s|ment|tion|ity|ness|ance|ence)?\b/g;
+        const words = text.match(nounPattern) || [];
+        
+        // Filter out common non-nouns and count unique nouns
+        const stopWords = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those', 'is', 'are', 'was', 'were']);
+        const nouns = new Set();
+        
+        words.forEach(word => {
+            const cleanWord = word.replace(/^(the |a |an )/, '').trim();
+            if (cleanWord.length > 2 && !stopWords.has(cleanWord)) {
+                nouns.add(cleanWord);
+            }
+        });
+
+        const count = nouns.size;
+        
+        if (count > 15) {
+            this.nounResultElement.textContent = '🟢';
+            this.nounResultElement.style.color = '#10b981';
+        } else if (count >= 6) {
+            this.nounResultElement.textContent = '🟡';
+            this.nounResultElement.style.color = '#f59e0b';
+        } else {
+            this.nounResultElement.textContent = '🔴';
+            this.nounResultElement.style.color = '#ef4444';
+        }
+    }
+
+    async handleApiError(response) {
+        switch (response.status) {
+            case 402:
+                this.showError('Payment required. Please check your Hugging Face API token.');
+                break;
+            case 429:
+                this.showError('Rate limit exceeded. Please wait or add your API token for higher limits.');
+                break;
+            case 401:
+                this.showError('Invalid API token. Please check your Hugging Face API token.');
+                break;
+            case 503:
+                this.showError('Model is loading. Please try again in a few seconds.');
+                break;
+            default:
+                this.showError(`API error: ${response.status} - ${response.statusText}`);
+        }
+    }
+
+    validateReview() {
+        if (!this.currentReview) {
+            this.showError('Please select a review first using "Select Random Review"');
+            return false;
+        }
+        return true;
+    }
+
+    showSpinner() {
+        this.spinnerElement.style.display = 'block';
+    }
+
+    hideSpinner() {
+        this.spinnerElement.style.display = 'none';
+    }
+
+    showError(message) {
+        this.errorMessageElement.textContent = message;
+        this.errorMessageElement.style.display = 'block';
+    }
+
+    hideError() {
+        this.errorMessageElement.style.display = 'none';
+    }
+
+    clearResults() {
+        this.sentimentResultElement.textContent = '❓';
+        this.sentimentResultElement.style.color = '';
+        this.nounResultElement.textContent = '⚪';
+        this.nounResultElement.style.color = '';
     }
 }
 
-function analyzeSentimentResponse(response) {
-    const firstLine = response.split('\n')[0].toLowerCase();
-    
-    if (firstLine.includes('positive')) return '👍';
-    if (firstLine.includes('negative')) return '👎';
-    if (firstLine.includes('neutral')) return '❓';
-    
-    if (firstLine.includes('good') || firstLine.includes('great') || firstLine.includes('excellent') || 
-        firstLine.includes('awesome') || firstLine.includes('love') || firstLine.includes('wonderful')) {
-        return '👍';
-    }
-    
-    if (firstLine.includes('bad') || firstLine.includes('terrible') || firstLine.includes('awful') || 
-        firstLine.includes('hate') || firstLine.includes('poor')) {
-        return '👎';
-    }
-    
-    return '❓';
-}
-
-function analyzeNounsResponse(response) {
-    const firstLine = response.split('\n')[0].toLowerCase();
-    
-    if (firstLine.includes('high')) return '🟢';
-    if (firstLine.includes('medium')) return '🟡';
-    if (firstLine.includes('low')) return '🔴';
-    
-    const match = firstLine.match(/\d+/);
-    if (match) {
-        const count = parseInt(match[0]);
-        if (count > 15) return '🟢';
-        if (count >= 6) return '🟡';
-        return '🔴';
-    }
-    
-    return '⚪';
-}
-
-async function handleRandomReview() {
-    resetUI();
-    const review = getRandomReview();
-    if (review) {
-        currentReview = review;
-        reviewText.textContent = review.text;
-    }
-}
-
-async function handleSentimentAnalysis() {
-    if (!currentReview) {
-        showError('Please select a random review first');
-        return;
-    }
-    
-    try {
-        resetUI();
-        showSpinner();
-        sentimentBtn.disabled = true;
-        
-        const response = await callApi(
-            "Classify this review as positive, negative, or neutral: ",
-            currentReview.text
-        );
-        
-        const sentiment = analyzeSentimentResponse(response);
-        sentimentResult.textContent = sentiment;
-        
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        hideSpinner();
-        sentimentBtn.disabled = false;
-    }
-}
-
-async function handleNounsAnalysis() {
-    if (!currentReview) {
-        showError('Please select a random review first');
-        return;
-    }
-    
-    try {
-        resetUI();
-        showSpinner();
-        nounsBtn.disabled = true;
-        
-        const actualCount = countNouns(currentReview.text);
-        
-        const response = await callApi(
-            "Count the nouns in this review and return only High (>15), Medium (6-15), or Low (<6).",
-            currentReview.text
-        );
-        
-        const nounLevel = analyzeNounsResponse(response);
-        nounsResult.textContent = nounLevel;
-        
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        hideSpinner();
-        nounsBtn.disabled = false;
-    }
-}
-
-randomBtn.addEventListener('click', handleRandomReview);
-sentimentBtn.addEventListener('click', handleSentimentAnalysis);
-nounsBtn.addEventListener('click', handleNounsAnalysis);
-
-document.addEventListener('DOMContentLoaded', loadReviews);
+// Initialize the application when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new ReviewAnalyzer();
+});
