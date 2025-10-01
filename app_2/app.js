@@ -1,119 +1,121 @@
 let reviews = [];
 let currentReview = null;
 
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadReviews();
-    setupEventListeners();
-});
+const tokenInput = document.getElementById('token-input');
+const randomBtn = document.getElementById('random-btn');
+const sentimentBtn = document.getElementById('sentiment-btn');
+const nounsBtn = document.getElementById('nouns-btn');
+const reviewText = document.getElementById('review-text');
+const sentimentResult = document.getElementById('sentiment-result');
+const nounsResult = document.getElementById('nouns-result');
+const errorMessage = document.getElementById('error-message');
+const spinner = document.getElementById('spinner');
+
+const MODEL_ENDPOINTS = [
+    'https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct',
+    'https://api-inference.huggingface.co/models/microsoft/DialoGPT-large'
+];
+
+let currentModelIndex = 0;
 
 async function loadReviews() {
     try {
+        showSpinner();
         const response = await fetch('reviews_test.tsv');
         const tsvData = await response.text();
         
-        return new Promise((resolve) => {
-            Papa.parse(tsvData, {
-                header: true,
-                delimiter: '\t',
-                complete: (results) => {
-                    reviews = results.data.filter(review => review.text && review.text.trim());
-                    resolve();
-                },
-                error: (error) => {
-                    showError('Failed to parse TSV file: ' + error.message);
-                    resolve();
+        Papa.parse(tsvData, {
+            header: true,
+            delimiter: '\t',
+            complete: function(results) {
+                reviews = results.data.filter(review => review.text && review.text.trim());
+                hideSpinner();
+                if (reviews.length === 0) {
+                    showError('No reviews found in the TSV file');
                 }
-            });
+            },
+            error: function(error) {
+                hideSpinner();
+                showError('Error parsing TSV file: ' + error.message);
+            }
         });
     } catch (error) {
-        showError('Failed to load reviews file: ' + error.message);
+        hideSpinner();
+        showError('Error loading reviews: ' + error.message);
     }
 }
 
-function setupEventListeners() {
-    document.getElementById('random-review').addEventListener('click', showRandomReview);
-    document.getElementById('analyze-sentiment').addEventListener('click', analyzeSentiment);
-    document.getElementById('count-nouns').addEventListener('click', countNouns);
+function showSpinner() {
+    spinner.style.display = 'block';
 }
 
-function showRandomReview() {
+function hideSpinner() {
+    spinner.style.display = 'none';
+}
+
+function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.style.display = 'block';
+}
+
+function hideError() {
+    errorMessage.style.display = 'none';
+}
+
+function resetUI() {
+    sentimentResult.textContent = '❓';
+    nounsResult.textContent = '⚪';
+    hideError();
+}
+
+function getRandomReview() {
     if (reviews.length === 0) {
-        showError('No reviews loaded yet');
-        return;
+        showError('No reviews available');
+        return null;
     }
-    
-    resetUI();
-    const randomIndex = Math.floor(Math.random() * reviews.length);
-    currentReview = reviews[randomIndex];
-    document.getElementById('review-text').textContent = currentReview.text;
+    return reviews[Math.floor(Math.random() * reviews.length)];
 }
 
-async function analyzeSentiment() {
-    if (!currentReview) {
-        showError('Please select a review first');
-        return;
-    }
-    
-    const prompt = `Classify sentiment of this review as positive, negative, or neutral: "${currentReview.text}"`;
-    await callApi(prompt, 'sentiment', 'cardiffnlp/twitter-roberta-base-sentiment-latest');
-}
-
-async function countNouns() {
-    if (!currentReview) {
-        showError('Please select a review first');
-        return;
-    }
-    
-    const actualCount = countNounsInText(currentReview.text);
-    let level = 'Low';
-    if (actualCount > 15) level = 'High';
-    else if (actualCount >= 6) level = 'Medium';
-    
-    const resultElement = document.getElementById('result');
-    if (level === 'High') resultElement.innerHTML = 'Noun Count: 🟢 High (' + actualCount + ' nouns)';
-    else if (level === 'Medium') resultElement.innerHTML = 'Noun Count: 🟡 Medium (' + actualCount + ' nouns)';
-    else resultElement.innerHTML = 'Noun Count: 🔴 Low (' + actualCount + ' nouns)';
-}
-
-function countNounsInText(text) {
-    const words = text.toLowerCase().split(/\s+/);
-    const commonNouns = [
-        'product', 'review', 'time', 'year', 'friend', 'child', 'daughter', 'bottle', 'film',
-        'water', 'splash', 'pineapple', 'dr', 'oz', 'thing', 'way', 'people', 'work', 'life',
-        'world', 'house', 'car', 'book', 'movie', 'music', 'food', 'water', 'coffee', 'tea',
-        'phone', 'computer', 'money', 'day', 'week', 'month', 'year', 'hour', 'minute', 'second',
-        'family', 'friend', 'home', 'job', 'school', 'student', 'teacher', 'city', 'country',
-        'company', 'business', 'problem', 'solution', 'idea', 'story', 'information', 'system',
-        'service', 'price', 'quality', 'experience', 'result', 'change', 'development', 'level',
-        'question', 'answer', 'number', 'part', 'area', 'word', 'fact', 'piece', 'place', 'state',
-        'person', 'man', 'woman', 'child', 'boy', 'girl', 'mother', 'father', 'brother', 'sister',
-        'eye', 'hand', 'head', 'face', 'body', 'health', 'art', 'war', 'history', 'party', 'room',
-        'door', 'window', 'table', 'chair', 'bed', 'floor', 'wall', 'roof', 'garden', 'street',
-        'road', 'bridge', 'river', 'mountain', 'sea', 'ocean', 'sky', 'sun', 'moon', 'star',
-        'tree', 'flower', 'animal', 'dog', 'cat', 'bird', 'fish', 'horse', 'cow', 'sheep',
-        'color', 'sound', 'light', 'dark', 'heat', 'cold', 'size', 'weight', 'height', 'length',
-        'speed', 'temperature', 'direction', 'position', 'action', 'movement', 'thought', 'feeling',
-        'love', 'hate', 'fear', 'hope', 'dream', 'success', 'failure', 'beauty', 'truth', 'lie',
-        'game', 'sport', 'team', 'player', 'ball', 'goal', 'point', 'score', 'win', 'loss',
-        'price', 'cost', 'value', 'money', 'cash', 'bank', 'account', 'card', 'bill', 'tax',
-        'law', 'rule', 'government', 'president', 'minister', 'office', 'power', 'right', 'freedom',
-        'peace', 'war', 'army', 'soldier', 'weapon', 'battle', 'victory', 'defeat', 'enemy', 'friend'
+function countNouns(text) {
+    const nounRegex = /\b(NN|NNS|NNP|NNPS)\b/;
+    const posTags = [
+        'NN', 'NNS', 'NNP', 'NNPS'
     ];
     
-    return words.filter(word => {
-        return commonNouns.includes(word) || 
-               (word.length > 3 && !word.match(/[0-9]/) && 
-                !['the','and','but','for','with','from','this','that','have','been','they','what','when','where','how'].includes(word));
-    }).length;
+    const words = text.toLowerCase().split(/\s+/);
+    let nounCount = 0;
+    
+    words.forEach(word => {
+        if (word.length < 2) return;
+        
+        const cleanWord = word.replace(/[^a-z]/g, '');
+        if (cleanWord.length < 2) return;
+        
+        if (posTags.some(tag => {
+            const pattern = new RegExp(`\\b${cleanWord}\\b`, 'i');
+            return nounRegex.test(tag) && pattern.test(text);
+        })) {
+            nounCount++;
+        } else {
+            if (cleanWord.length > 3 && 
+                !['the', 'and', 'but', 'for', 'nor', 'not', 'yet', 'so'].includes(cleanWord) &&
+                !cleanWord.endsWith('ly') && !cleanWord.endsWith('ing') && 
+                !cleanWord.endsWith('ed') && !cleanWord.endsWith('es') &&
+                !cleanWord.match(/^\d+$/) && cleanWord.match(/[aeiou]/i)) {
+                nounCount++;
+            }
+        }
+    });
+    
+    return nounCount;
 }
 
-async function callApi(prompt, analysisType, model) {
-    resetUI();
-    showSpinner(true);
+async function callApi(prompt, text) {
+    const fullPrompt = prompt + text;
+    const token = tokenInput.value.trim();
     
-    const token = document.getElementById('token-input').value.trim();
     const headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
     };
     
     if (token) {
@@ -121,79 +123,141 @@ async function callApi(prompt, analysisType, model) {
     }
     
     try {
-        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        const response = await fetch(MODEL_ENDPOINTS[currentModelIndex], {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ inputs: prompt })
+            body: JSON.stringify({ inputs: fullPrompt })
         });
         
+        if (response.status === 402 || response.status === 429) {
+            if (currentModelIndex < MODEL_ENDPOINTS.length - 1) {
+                currentModelIndex++;
+                return await callApi(prompt, text);
+            } else {
+                throw new Error('Rate limit exceeded on all models. Please try again later or use your API token.');
+            }
+        }
+        
         if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error('Model not found or API endpoint changed. Please check the model name.');
-            }
-            if (response.status === 402 || response.status === 429) {
-                throw new Error('API rate limit exceeded. Please try again later or use your own API token.');
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`API error: ${response.status}`);
         }
         
         const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
+        return data[0]?.generated_text || '';
+    } catch (error) {
+        if (error.message.includes('Rate limit') && currentModelIndex < MODEL_ENDPOINTS.length - 1) {
+            currentModelIndex++;
+            return await callApi(prompt, text);
         }
+        throw error;
+    }
+}
 
-        processApiResponse(data, analysisType);
+function analyzeSentimentResponse(response) {
+    const firstLine = response.split('\n')[0].toLowerCase();
+    
+    if (firstLine.includes('positive')) return '👍';
+    if (firstLine.includes('negative')) return '👎';
+    if (firstLine.includes('neutral')) return '❓';
+    
+    if (firstLine.includes('good') || firstLine.includes('great') || firstLine.includes('excellent') || 
+        firstLine.includes('awesome') || firstLine.includes('love') || firstLine.includes('wonderful')) {
+        return '👍';
+    }
+    
+    if (firstLine.includes('bad') || firstLine.includes('terrible') || firstLine.includes('awful') || 
+        firstLine.includes('hate') || firstLine.includes('poor')) {
+        return '👎';
+    }
+    
+    return '❓';
+}
+
+function analyzeNounsResponse(response) {
+    const firstLine = response.split('\n')[0].toLowerCase();
+    
+    if (firstLine.includes('high')) return '🟢';
+    if (firstLine.includes('medium')) return '🟡';
+    if (firstLine.includes('low')) return '🔴';
+    
+    const match = firstLine.match(/\d+/);
+    if (match) {
+        const count = parseInt(match[0]);
+        if (count > 15) return '🟢';
+        if (count >= 6) return '🟡';
+        return '🔴';
+    }
+    
+    return '⚪';
+}
+
+async function handleRandomReview() {
+    resetUI();
+    const review = getRandomReview();
+    if (review) {
+        currentReview = review;
+        reviewText.textContent = review.text;
+    }
+}
+
+async function handleSentimentAnalysis() {
+    if (!currentReview) {
+        showError('Please select a random review first');
+        return;
+    }
+    
+    try {
+        resetUI();
+        showSpinner();
+        sentimentBtn.disabled = true;
+        
+        const response = await callApi(
+            "Classify this review as positive, negative, or neutral: ",
+            currentReview.text
+        );
+        
+        const sentiment = analyzeSentimentResponse(response);
+        sentimentResult.textContent = sentiment;
         
     } catch (error) {
         showError(error.message);
     } finally {
-        showSpinner(false);
+        hideSpinner();
+        sentimentBtn.disabled = false;
     }
 }
 
-function processApiResponse(data, analysisType) {
-    const resultElement = document.getElementById('result');
+async function handleNounsAnalysis() {
+    if (!currentReview) {
+        showError('Please select a random review first');
+        return;
+    }
     
-    if (analysisType === 'sentiment') {
-        let sentiment = 'Unable to determine';
+    try {
+        resetUI();
+        showSpinner();
+        nounsBtn.disabled = true;
         
-        if (Array.isArray(data) && data.length > 0) {
-            const firstItem = data[0];
-            if (Array.isArray(firstItem) && firstItem.length > 0) {
-                sentiment = firstItem[0].label || '';
-            } else if (firstItem.label) {
-                sentiment = firstItem.label;
-            }
-        } else if (data.label) {
-            sentiment = data.label;
-        }
+        const actualCount = countNouns(currentReview.text);
         
-        sentiment = sentiment.toLowerCase();
+        const response = await callApi(
+            "Count the nouns in this review and return only High (>15), Medium (6-15), or Low (<6).",
+            currentReview.text
+        );
         
-        if (sentiment.includes('positive') || sentiment.includes('pos')) {
-            resultElement.innerHTML = 'Sentiment: 👍 Positive';
-        } else if (sentiment.includes('negative') || sentiment.includes('neg')) {
-            resultElement.innerHTML = 'Sentiment: 👎 Negative';
-        } else if (sentiment.includes('neutral') || sentiment.includes('neu')) {
-            resultElement.innerHTML = 'Sentiment: ❓ Neutral';
-        } else {
-            resultElement.innerHTML = 'Sentiment: ❓ Unable to determine';
-        }
+        const nounLevel = analyzeNounsResponse(response);
+        nounsResult.textContent = nounLevel;
+        
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        hideSpinner();
+        nounsBtn.disabled = false;
     }
 }
 
-function showSpinner(show) {
-    document.getElementById('spinner').style.display = show ? 'block' : 'none';
-}
+randomBtn.addEventListener('click', handleRandomReview);
+sentimentBtn.addEventListener('click', handleSentimentAnalysis);
+nounsBtn.addEventListener('click', handleNounsAnalysis);
 
-function showError(message) {
-    const errorElement = document.getElementById('error-message');
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
-}
-
-function resetUI() {
-    document.getElementById('error-message').style.display = 'none';
-    document.getElementById('result').textContent = 'Results will appear here';
-}
+document.addEventListener('DOMContentLoaded', loadReviews);
